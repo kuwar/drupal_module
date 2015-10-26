@@ -1,0 +1,9 @@
+name = "Product Management"
+description = A module which handles product related things.
+package = "Product Management"
+core = 7.x
+author = Sanjeev
+
+files[] = product_management.module
+
+php = 5.2

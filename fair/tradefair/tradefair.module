@@ -1,0 +1,1027 @@
+<?php
+
+// $Id$
+/**
+ * @file
+ * A module for managing tradefairs.
+ */
+
+/**
+ * Implements hook_help().
+ * This function return the help info regarding tradefair
+ * @param <type> $path
+ * @param <type> $arg
+ * @return <type>
+ */
+function tradefair_help($path, $arg) {
+    if ($path == 'admin/help#tradefair') {
+        return t('A tradefair module, this module handles tradefair .');
+    }
+}
+
+/**
+ * Implements hook_menu().
+ * Creates the menu for admin UI and realted paths for tradefair entity
+ * @return array
+ */
+function tradefair_menu() {
+
+    $items['trade-fairs'] = array(
+        'title' => 'Tradefairs',
+        'description' => 'Manage tradefairs.',
+        'access callback' => TRUE,
+        'page callback' => 'drupal_get_form',
+        'page arguments' => array('tradefair_list'),
+    );
+
+    $items['messen'] = array(
+        'title' => 'Messen',
+        'description' => 'Manage tradefairs.',
+        'access callback' => TRUE,
+        'page callback' => 'drupal_get_form',
+        'page arguments' => array('tradefair_list'),
+    );
+
+    $items['autocomplete/name'] = array(
+        'page callback' => 'tradefair_autocomplete_name',
+        'access callback' => TRUE,
+        'type' => MENU_CALLBACK
+    );
+
+    $items['autocomplete/city'] = array(
+        'page callback' => 'tradefair_autocomplete_city',
+        'access callback' => TRUE,
+        'type' => MENU_CALLBACK
+    );
+
+
+    $items['ajax/city/%'] = array(
+        'page callback' => 'tradefair_cities',
+        'page arguments' => array(2),
+        'access callback' => TRUE,
+        'type' => MENU_CALLBACK
+    );
+
+    $items['ajax/fair/%'] = array(
+        'page callback' => 'tradefair_ajax_list',
+        'page arguments' => array(2),
+        'access callback' => TRUE,
+        'type' => MENU_CALLBACK
+    );
+
+
+
+    return $items;
+}
+
+function tradefair_list() {
+    global $base_url;
+    global $language;
+
+    $detect = mobile_detect_get_object();
+    $is_mobile = $detect->isMobile();
+    $is_tablet = $detect->isTablet();
+
+    if ($is_mobile && !$is_tablet){
+        drupal_add_js($base_url . '/' . drupal_get_path('theme', 'neureuter') . '/scripts/jqueryui.1.8.9.js');
+        drupal_add_js($base_url . '/' . drupal_get_path('theme', 'neureuter') . '/scripts/mtf.js');
+        // drupal_add_js($base_url . '/' . drupal_get_path('theme', 'neureuter') . '/scripts/jquery.dataTables.min.js');
+        // drupal_add_js('jQuery(document).ready(function () { jQuery(".table-select-processed").dataTable(); });', 'inline');
+
+        $europe_img_url = $base_url . '/' . drupal_get_path('module', 'tradefair') . '/images/map-europe.png';
+        $asia_img_url = $base_url . '/' . drupal_get_path('module', 'tradefair') . '/images/map-asia.png';
+        $africa_img_url = $base_url . '/' . drupal_get_path('module', 'tradefair') . '/images/map-africa.png';
+        $welt_img_url = $base_url . '/' . drupal_get_path('module', 'tradefair') . '/images/map-welt.png';
+
+
+        /* 
+         */
+
+        $tradefair_description = t('Here you will find an overview of the trade fairs that we currently work with. There are different ways to find a particular event: using our search tool, you can look up specific trade fairs. Or you can just browse through our interactive fair overview. In the interactive overview, you can select a region and view the events that take place at that specific location. If you are interested in more information about a trade fair, just click on the name.');
+
+        $form['tradefair'] = array(
+            '#type' => 'markup',
+            '#prefix' => '<div class="tradefair-container">',
+            '#suffix' => '</div>',
+        );
+
+
+        $form['tradefair']['top'] = array(
+            '#type' => 'markup',
+            '#prefix' => '<div class="tradefair-top">',
+            '#suffix' => '</div>',
+        );
+
+
+        $form['tradefair']['top']['name'] = array(
+            '#type' => 'textfield',
+            '#size' => 15,
+            //'#required' => TRUE,
+            '#autocomplete_path' => 'autocomplete/name',
+            '#attributes' => array('placeholder' => t('Trade fair'))
+        );
+
+        $form['tradefair']['top']['city'] = array(
+            '#type' => 'textfield',
+            '#size' => 15,
+            //'#required' => TRUE,
+            '#autocomplete_path' => 'autocomplete/city',
+            '#attributes' => array('placeholder' => t('City'))
+        );
+
+        $form['tradefair']['top']['date']['day'] = array(
+            '#type' => 'hidden',
+            '#size' => 15,
+            //'#required' => TRUE,
+            '#attributes' => array('id' => array('day'), 'placeholder' => 'DD'),
+        );
+        $form['tradefair']['top']['date']['month'] = array(
+            '#type' => 'hidden',
+            '#size' => 15,
+            //'#required' => TRUE,
+            '#attributes' => array('id' => array('month'), 'placeholder' => 'MM'),
+        );
+        $form['tradefair']['top']['date']['year'] = array(
+            '#type' => 'hidden',
+            '#size' => 15,
+            //'#required' => TRUE,
+            '#attributes' => array('id' => array('year'), 'placeholder' => 'YYYY'),
+        );
+
+        $form['tradefair']['top']['date']['all'] = array(
+            '#type' => 'hidden',
+            '#attributes' => array('id' => array('txtDate')),
+        );
+
+        /* $form['tradefair']['top']['date']['calendar'] = array(
+          '#type' => 'markup',
+          '#markup' => '<div class="date-pick"><a href="#" id="date-cal">date</a></div>',
+          ); */
+
+
+        $form['tradefair']['top']['submit'] = array(
+            '#type' => 'submit',
+            '#value' => t('Search'),
+            '#attributes' => array('class' => array('submit-button')),
+        );
+
+
+        $header = array(
+            'title' => array('data' => t('Trade Fair'), 'type' => 'property', 'specifier' => 'title', 'class' => array('detail-class')),
+            'detail' => array('data' => t('Trade Fair Details'), 'class' => array('detail-class')),
+            'city' => array('data' => t('City '), 'type' => 'field', 'specifier' => array('field' => 'field_city', 'column' => 'value'), 'class' => array('detail-class')),
+            'country' => array('data' => t('Country'), 'type' => 'field', 'specifier' => array('field' => 'field_country', 'column' => 'value'), 'class' => array('detail-class')),
+            'date' => array('data' => t('Date '), 'type' => 'field', 'specifier' => array('field' => 'field_start_date', 'column' => 'value'), 'sort' => 'asc', 'class' => array('detail-class')),
+            'deadline' => array('data' => t('Closing date'), 'type' => 'field', 'specifier' => array('field' => 'field_deadline', 'column' => 'value'), 'class' => array('detail-class')),
+            'website' => array('data' => t('Website'), 'class' => array('detail-class')),
+            'onlinesystem' => array('data' => t('ONLINE ORDER FORMS'), 'class' => array('detail-class')),
+        );
+
+        $keywords = "";
+        if ($_POST) {
+            $keywords = $_POST['name'];
+            $city = $_POST['city'];
+
+            if ( $city === 'Düsseldorf' ) {
+                $city = 'Dusseldorf';
+            }
+
+            if ( $city === 'Köln' ) {
+                $city = 'Cologne';
+            }
+
+            if ( $city === 'München' ) {
+                $city = 'Munich';
+            }
+
+            if ( $city === 'Nürnberg' ) {
+                $city = 'Nuremberg';
+            }
+            
+            $year = $_POST['year'];
+            $month = $_POST['month'];
+            $day = $_POST['day'];
+        }
+
+
+        $query = new EntityFieldQuery;
+        $query->entityCondition('entity_type', 'node');
+        $query->entityCondition('bundle', 'tradefailr');
+        $query->propertyCondition('title', '%' . $keywords . '%', 'LIKE');
+        $query->propertyCondition('language',  $language->language, 'LIKE');
+
+        if (!empty($city)) {
+            $query->fieldCondition('field_city', 'value', '%' . $city . '%', 'LIKE');
+        }
+
+        if (!empty($year) && !empty($month) && !empty($day)) {
+            $date = $year . '-' . $month . '-' . $day . ' 00:00:00';
+            $query->fieldCondition('field_start_date', 'value', $date, '<=', 1);
+            $query->fieldCondition('field_end_date', 'value', $date, '>=', 1);
+        }
+        //checkings for key->value of city;
+        $field = field_info_field('field_city');
+        $city_array_values = list_allowed_values($field);
+        //var_dump($allowed_values);
+
+        // $query->pager(10);
+        $query->tablesort($header);
+        $result = $query->execute();
+        $nodes = node_load_multiple(array_keys($result['node']));
+        foreach ($nodes as $node) {
+            $city = field_get_items('node', $node, 'field_city');
+            $city = $city[0]['value'];
+
+            $country = field_get_items('node', $node, 'field_country');
+            $country = $country[0]['value'];
+
+            $start_date = field_get_items('node', $node, 'field_start_date');
+            $start_date = $start_date[0]['value'];
+            //$start_date = explode(' ', $start_date);
+            //$start_date = $start_date[0];
+            //$start_date = str_replace('-', '.', $start_date);
+            //$start_date = date('y.m.d', $start_date);
+            $start_date = strtotime($start_date);
+            $start_day = floor($start_date/86400);
+            $start_date = date('d.m.y', $start_date);
+
+            $end_date = field_get_items('node', $node, 'field_end_date');
+            $end_date = $end_date[0]['value'];
+            //$end_date = explode(' ', $end_date);
+            //$end_date = $end_date[0];
+            //$end_date = str_replace('-', '.', $end_date);
+            $end_date = strtotime($end_date);
+            $end_day = floor($end_date/86400);
+            $end_date = date('d.m.y', $end_date);
+
+
+
+            $url = field_get_items('node', $node, 'field_url');
+            $url = $url[0]['value'];
+
+            $bestellsystem = field_get_items('node', $node, 'field_bestell_system');
+            $bestellsystem = $bestellsystem[0]['value'];
+            // $bestellsystem = strtotime($bestellsystem);
+            // $bestellsystem = date('d.m.y', $bestellsystem);
+
+            //getting tradefair file
+            $tradefair_file = field_get_items('node', $node, 'field_trade_fair_files');
+            //var_dump($tradefair_file[0]['filename']);
+            $tradefair_file_name = $tradefair_file[0]['filename'];
+            $tradefair_file_path = $base_url . '/sites/default/files/';
+            $tradefair_file_url = $tradefair_file_path . $tradefair_file_name;
+
+            if ($tradefair_file_name && !$bestellsystem) {
+                $bestellsystem_link = $tradefair_file_url;
+                $title = $tradefair_file_name;
+            }
+            else {
+               $bestellsystem_link =  drupal_get_path_alias($bestellsystem);
+               $title = $bestellsystem_link;
+            }
+
+            $deadline = field_get_items('node', $node, 'field_deadline');
+            $deadline = $deadline[0]['value'];
+            // $deadline = explode(' ', $deadline);
+            // $deadline = $deadline[0];
+            // $deadline = str_replace('-', '.', $deadline);
+            $deadline = strtotime($deadline);
+            $deadline = date('d.m.y', $deadline);
+
+
+
+            $today_date = strtotime(date('d.m.y'));
+            $today_day = floor($today_date/86400);
+
+            if ($today_day >= $start_day && $today_day <= $end_day) {
+                $class = 'current-trade-fair';
+            } else {
+                $class = "";
+            }
+            // if ($today_date >= strtotime($start_date) && $today_date <= strtotime($end_date) ) {
+            //     $class = 'current-trade-fair';
+            // } else {
+            //     $class = "";
+            // }
+
+
+            $options[$node->nid] = array(
+                'title' => array('data' => array(
+                        '#type' => 'link',
+                        '#title' => $node->title,
+                        '#href' => drupal_get_path_alias('node/' . $node->nid), //"trade-fairs/" . $node->nid,
+                    ), 'class' => array("title-trade $class")),
+                'detail' => array('data' => array(
+                        '#type' => 'link',
+                        '#title' => 'detail',
+                        '#href' => drupal_get_path_alias('node/' . $node->nid),
+                    ), 'class' => array('messe-detail')),
+                'city' => array('data' => array(
+                        '#type' => 'item',
+                        '#markup' => ($language->language == 'de') ? $city_array_values[$city] : $city,
+                    ), 'class' => array('city-detail', 'form-item form-type-item')),
+                'country' => array('data' => array(
+                        '#type' => 'item',
+                        '#markup' => $country,
+                    ), 'class' => array('country-detail')),
+                'date' => array('data' => array(
+                        '#type' => 'item',
+                        '#markup' => $start_date . '-' . $end_date,
+                    ), 'class' => array('date-detail')),
+                'deadline' => array('data' => array(
+                        '#type' => 'item',
+                        '#markup' => $deadline,
+                    ), 'class' => array('deadline-detail')),
+                'website' => array('data' => array(
+                        '#type' => 'link',
+                        '#title' => $url,
+                        '#href' => $url,
+                    ), 'class' => array('messe-website')),
+                'onlinesystem' => array('data' => array(
+                        '#type' => 'link',
+                        '#title' => $title,
+                        '#href' => $bestellsystem_link,
+                    ), 'class' => array('messe-onlinesystem')),
+            );
+        }
+        $form['tradefair']['nodes'] = array(
+            '#type' => 'tableselect',
+            '#header' => $header,
+            '#options' => $options,
+            '#empty' => t('No tradefair available.'),
+        );
+        //$form['tradefair']['pager'] = array('#markup' => theme('pager', array('tags' => NULL)));
+
+        $form['tradefair']['current_mark'] = array(
+            '#type' => 'markup',
+            '#markup' => t('Current'),
+            '#prefix' => '<div class="current-trade-fair-down mobile-circle-active">',
+            '#suffix' => '</div>',
+        );
+
+        $form['tradefair']['descrip'] = array(
+            '#type' => 'markup',
+            '#prefix' => '<div class="tradefair-container"><p>' . $tradefair_description,
+            '#suffix' => '</p></div>',
+        );
+
+        return $form;
+
+    }
+    else{
+    
+        drupal_add_js($base_url . '/' . drupal_get_path('theme', 'neureuter') . '/scripts/jqueryui.1.8.9.js');
+        drupal_add_js($base_url . '/' . drupal_get_path('theme', 'neureuter') . '/scripts/tf.js');
+
+        $europe_img_url = $base_url . '/' . drupal_get_path('module', 'tradefair') . '/images/map-europe.png';
+        $asia_img_url = $base_url . '/' . drupal_get_path('module', 'tradefair') . '/images/map-asia.png';
+        $africa_img_url = $base_url . '/' . drupal_get_path('module', 'tradefair') . '/images/map-africa.png';
+        $welt_img_url = $base_url . '/' . drupal_get_path('module', 'tradefair') . '/images/map-welt.png';
+
+
+        /* $form['projectgroup'] = array(
+          '#theme' => 'map',
+          '#element' => "here",
+          ); */
+
+
+        /*  $form['map'] = array(
+          '#type' => 'markup',
+          '#prefix' => '<div class="tradefair-map-container">',
+          '#suffix' => '</div>',
+          );
+
+
+          $form['map']['fair-container'] = array(
+          '#type' => 'markup',
+          '#prefix' => '<div class="fair-container">',
+          '#suffix' => '</div>',
+          );
+
+          $form['map']['europe-map'] = array(
+          '#type' => 'markup',
+          '#prefix' => '<div class="europe-map map"><div class="cities"></div><img src="' . $europe_img_url . '"/>',
+          '#suffix' => '</div>',
+          );
+
+          $form['map']['asia-map'] = array(
+          '#type' => 'markup',
+          '#prefix' => '<div class="asia-map map"><div class="cities"></div><img src="' . $asia_img_url . '"/>',
+          '#suffix' => '</div>',
+          );
+          $form['map']['africa-map'] = array(
+          '#type' => 'markup',
+          '#prefix' => '<div class="africa-map map"><div class="cities"></div><img src="' . $africa_img_url . '"/>',
+          '#suffix' => '</div>',
+          );
+          $form['map']['welt-map'] = array(
+          '#type' => 'markup',
+          '#prefix' => '<div class="welt-map map"><div class="cities"></div><img src="' . $welt_img_url . '"/>',
+          '#suffix' => '</div>',
+          );
+
+
+
+          //right bar
+          $form['map']['continent-holder'] = array(
+          '#type' => 'markup',
+          '#prefix' => '<div class="continent-container">',
+          '#suffix' => '</div>',
+          );
+
+          $form['map']['continent-holder']['europe'] = array(
+          '#type' => 'markup',
+          '#prefix' => '<div class="continent europe">',
+          '#suffix' => '</div>',
+          );
+
+          $form['map']['continent-holder']['asia'] = array(
+          '#type' => 'markup',
+          '#prefix' => '<div class="continent asia">',
+          '#suffix' => '</div>',
+          );
+          $form['map']['continent-holder']['africa'] = array(
+          '#type' => 'markup',
+          '#prefix' => '<div class="continent africa">',
+          '#suffix' => '</div>',
+          );
+          $form['map']['continent-holder']['welt'] = array(
+          '#type' => 'markup',
+          '#prefix' => '<div class="continent welt">',
+          '#suffix' => '</div>',
+          );
+         */
+
+        $tradefair_description = t('Here you will find an overview of the trade fairs that we currently work with. There are different ways to find a particular event: using our search tool, you can look up specific trade fairs. Or you can just browse through our interactive fair overview. In the interactive overview, you can select a region and view the events that take place at that specific location. If you are interested in more information about a trade fair, just click on the name.');
+
+        $form['tradefair'] = array(
+            '#type' => 'markup',
+            '#prefix' => '<div class="tradefair-container"><p>' . $tradefair_description,
+            '#suffix' => '</p></div>',
+        );
+
+
+        $form['tradefair']['top'] = array(
+            '#type' => 'markup',
+            '#prefix' => '<div class="tradefair-top">',
+            '#suffix' => '</div>',
+        );
+
+
+        $form['tradefair']['top']['name'] = array(
+            '#type' => 'textfield',
+            '#size' => 15,
+            //'#required' => TRUE,
+            '#autocomplete_path' => 'autocomplete/name',
+            '#attributes' => array('placeholder' => t('Trade fair'))
+        );
+
+        $form['tradefair']['top']['city'] = array(
+            '#type' => 'textfield',
+            '#size' => 15,
+            //'#required' => TRUE,
+            '#autocomplete_path' => 'autocomplete/city',
+            '#attributes' => array('placeholder' => t('City'))
+        );
+
+        $form['tradefair']['top']['date']['day'] = array(
+            '#type' => 'textfield',
+            '#size' => 15,
+            //'#required' => TRUE,
+            '#attributes' => array('id' => array('day'), 'placeholder' => 'DD'),
+        );
+        $form['tradefair']['top']['date']['month'] = array(
+            '#type' => 'textfield',
+            '#size' => 15,
+            //'#required' => TRUE,
+            '#attributes' => array('id' => array('month'), 'placeholder' => 'MM'),
+        );
+        $form['tradefair']['top']['date']['year'] = array(
+            '#type' => 'textfield',
+            '#size' => 15,
+            //'#required' => TRUE,
+            '#attributes' => array('id' => array('year'), 'placeholder' => 'YYYY'),
+        );
+
+        $form['tradefair']['top']['date']['all'] = array(
+            '#type' => 'hidden',
+            '#attributes' => array('id' => array('txtDate')),
+        );
+
+        /* $form['tradefair']['top']['date']['calendar'] = array(
+          '#type' => 'markup',
+          '#markup' => '<div class="date-pick"><a href="#" id="date-cal">date</a></div>',
+          ); */
+
+
+        $form['tradefair']['top']['submit'] = array(
+            '#type' => 'submit',
+            '#value' => t('Search'),
+            '#attributes' => array('class' => array('submit-button')),
+        );
+
+
+        $header = array(
+            'title' => array('data' => t('Trade Fair'), 'type' => 'property', 'specifier' => 'title', 'class' => array('detail-class')),
+            'detail' => array('data' => t('Trade Fair Details'), 'class' => array('detail-class')),
+            'city' => array('data' => t('City '), 'type' => 'field', 'specifier' => array('field' => 'field_city', 'column' => 'value'), 'class' => array('detail-class')),
+            'country' => array('data' => t('Country'), 'type' => 'field', 'specifier' => array('field' => 'field_country', 'column' => 'value'), 'class' => array('detail-class')),
+            'date' => array('data' => t('Date '), 'type' => 'field', 'specifier' => array('field' => 'field_start_date', 'column' => 'value'), 'sort' => 'asc', 'class' => array('detail-class')),
+            'deadline' => array('data' => t('Closing date'), 'type' => 'field', 'specifier' => array('field' => 'field_deadline', 'column' => 'value'), 'class' => array('detail-class')),
+            'website' => array('data' => t('Website'), 'class' => array('detail-class')),
+            'onlinesystem' => array('data' => t('ONLINE ORDER FORMS'), 'class' => array('detail-class')),
+        );
+
+        $keywords = "";
+        if ($_POST) {
+            $keywords = $_POST['name'];
+            $city = $_POST['city'];
+
+            if ( $city === 'Düsseldorf' ) {
+                $city = 'Dusseldorf';
+            }
+
+            if ( $city === 'Köln' ) {
+                $city = 'Cologne';
+            }
+
+            if ( $city === 'München' ) {
+                $city = 'Munich';
+            }
+
+            if ( $city === 'Nürnberg' ) {
+                $city = 'Nuremberg';
+            }
+
+            $year = $_POST['year'];
+            $month = $_POST['month'];
+            $day = $_POST['day'];
+        }
+
+
+        $query = new EntityFieldQuery;
+        $query->entityCondition('entity_type', 'node');
+        $query->entityCondition('bundle', 'tradefailr');
+        $query->propertyCondition('title', '%' . $keywords . '%', 'LIKE');
+        $query->propertyCondition('language',  $language->language, 'LIKE');
+
+        if (!empty($city)) {
+            $query->fieldCondition('field_city', 'value', '%' . $city . '%', 'LIKE');
+        }
+
+        if (!empty($year) && !empty($month) && !empty($day)) {
+            $date = $year . '-' . $month . '-' . $day . ' 00:00:00';
+            $query->fieldCondition('field_start_date', 'value', $date, '<=', 1);
+            $query->fieldCondition('field_end_date', 'value', $date, '>=', 1);
+        }
+        //checkings for key->value of city;
+        $field = field_info_field('field_city');
+        $city_array_values = list_allowed_values($field);
+        //var_dump($allowed_values);
+
+        //checkings for key->value of country;
+        $field_country = field_info_field('field_country');
+        $country_array_values = list_allowed_values($field_country);
+        //var_dump($allowed_values);
+
+        $query->pager(10);
+        $query->tablesort($header);
+        $result = $query->execute();
+        $nodes = node_load_multiple(array_keys($result['node']));
+        foreach ($nodes as $node) {
+            $city = field_get_items('node', $node, 'field_city');
+            $city = $city[0]['value'];
+
+            $country = field_get_items('node', $node, 'field_country');
+            $country = $country[0]['value'];
+
+            $start_date = field_get_items('node', $node, 'field_start_date');
+            $start_date = $start_date[0]['value'];
+            //$start_date = explode(' ', $start_date);
+            //$start_date = $start_date[0];
+            //$start_date = str_replace('-', '.', $start_date);
+            //$start_date = date('y.m.d', $start_date);
+            $start_date = strtotime($start_date);
+            $start_day = floor($start_date/86400);
+            $start_date = date('d.m.y', $start_date);
+
+            $end_date = field_get_items('node', $node, 'field_end_date');
+            $end_date = $end_date[0]['value'];
+            //$end_date = explode(' ', $end_date);
+            //$end_date = $end_date[0];
+            //$end_date = str_replace('-', '.', $end_date);
+            $end_date = strtotime($end_date);
+            $end_day = floor($end_date/86400);
+            $end_date = date('d.m.y', $end_date);
+
+
+
+            $url = field_get_items('node', $node, 'field_url');
+            $url = $url[0]['value'];
+
+            $bestellsystem = field_get_items('node', $node, 'field_bestell_system');
+            $bestellsystem = $bestellsystem[0]['value'];
+            // $bestellsystem = strtotime($bestellsystem);
+            // $bestellsystem = date('d.m.y', $bestellsystem);
+
+            //getting tradefair file
+            $tradefair_file = field_get_items('node', $node, 'field_trade_fair_files');
+            //var_dump($tradefair_file[0]['filename']);
+            $tradefair_file_name = $tradefair_file[0]['filename'];
+            $tradefair_file_path = $base_url . '/sites/default/files/';
+            $tradefair_file_url = $tradefair_file_path . $tradefair_file_name;
+
+            if ($tradefair_file_name && !$bestellsystem) {
+                $bestellsystem_link = $tradefair_file_url;
+                $title = $tradefair_file_name;
+            }
+            else {
+               $bestellsystem_link =  drupal_get_path_alias($bestellsystem);
+               $title = $bestellsystem_link;
+            }
+
+            $deadline = field_get_items('node', $node, 'field_deadline');
+            $deadline = $deadline[0]['value'];
+            // $deadline = explode(' ', $deadline);
+            // $deadline = $deadline[0];
+            // $deadline = str_replace('-', '.', $deadline);
+            $deadline = strtotime($deadline);
+            $deadline = date('d.m.y', $deadline);
+
+
+
+            $today_date = strtotime(date('d.m.y'));
+            $today_day = floor($today_date/86400);
+
+            if ($today_day >= $start_day && $today_day <= $end_day) {
+                $class = 'current-trade-fair';
+            } else {
+                $class = "";
+            }
+            // if ($today_date >= strtotime($start_date) && $today_date <= strtotime($end_date) ) {
+            //     $class = 'current-trade-fair';
+            // } else {
+            //     $class = "";
+            // }
+
+
+            $options[$node->nid] = array(
+                'title' => array('data' => array(
+                        '#type' => 'link',
+                        '#title' => $node->title,
+                        '#href' => drupal_get_path_alias('node/' . $node->nid), //"trade-fairs/" . $node->nid,
+                    ), 'class' => array("title-trade $class")),
+                'detail' => array('data' => array(
+                        '#type' => 'link',
+                        '#title' => 'detail',
+                        '#href' => drupal_get_path_alias('node/' . $node->nid),
+                    ), 'class' => array('messe-detail')),
+                'city' => array('data' => array(
+                        '#type' => 'item',
+                        '#markup' => ($language->language == 'de') ? $city_array_values[$city] : $city,
+                    ), 'class' => array('city-detail', 'form-item form-type-item')),
+                'country' => array('data' => array(
+                        '#type' => 'item',
+                        '#markup' => ($language->language == 'en') ? $country_array_values[$country] : $country,
+                    ), 'class' => array('country-detail')),
+                'date' => array('data' => array(
+                        '#type' => 'item',
+                        '#markup' => $start_date . '-' . $end_date,
+                    ), 'class' => array('date-detail')),
+                'deadline' => array('data' => array(
+                        '#type' => 'item',
+                        '#markup' => $deadline,
+                    ), 'class' => array('deadline-detail')),
+                'website' => array('data' => array(
+                        '#type' => 'link',
+                        '#title' => $url,
+                        '#href' => $url,
+                    ), 'class' => array('messe-website')),
+                'onlinesystem' => array('data' => array(
+                        '#type' => 'link',
+                        '#title' => $title,
+                        '#href' => $bestellsystem_link,
+                    ), 'class' => array('messe-onlinesystem')),
+            );
+        }
+        $form['tradefair']['nodes'] = array(
+            '#type' => 'tableselect',
+            '#header' => $header,
+            '#options' => $options,
+            '#empty' => t('No tradefair available.'),
+        );
+        $form['tradefair']['pager'] = array('#markup' => theme('pager', array('tags' => NULL)));
+
+        return $form;
+    }
+}
+
+function tradefair_list_submit($form, &$form_state) {
+    //$operation = $form_state['values']['operation'];
+    // Filter out unchecked holidays
+    //$holidays = array_filter($form_state['values']['holidays']);
+    // We need to rebuild the form to go to a second step. For example, to
+    // show the confirmation form for the deletion of holidays.
+    $form_state['rebuild'] = TRUE;
+}
+
+function tradefair_autocomplete_name($string) {
+    $matches = array();
+
+    $query = db_select('node', 'n')
+            ->fields('n', array('title'))
+            ->condition('type', 'tradefailr')
+            ->condition('n.title', '%' . db_like($string) . '%', 'LIKE');
+    $return = $query->execute();
+
+
+    foreach ($return as $row) {
+        $matches[$row->title] = check_plain($row->title);
+    }
+
+    drupal_json_output($matches);
+}
+
+function tradefair_autocomplete_city($string) {
+    global $language;
+    $matches = array();
+    $query = new EntityFieldQuery;
+    $query->entityCondition('entity_type', 'node');
+    $query->entityCondition('bundle', 'tradefailr');
+    $query->fieldCondition('field_city', 'value', '%' . $string . '%', 'LIKE');
+
+    $result = $query->execute();
+
+    //checkings for key->value of city;
+    $field = field_info_field('field_city');
+    $city_array_values = list_allowed_values($field);
+    
+    $nodes = node_load_multiple(array_keys($result['node']));
+    foreach ($nodes as $node) {
+        $node = node_load($node->nid);
+        $city = field_get_items('node', $node, 'field_city');
+        $city = $city[0]['value'];
+
+        if ( $language->language === 'en' ) {
+            $matches[$city] = check_plain($city);
+        }
+        else {
+            $matches[$city_array_values[$city]] = check_plain($city_array_values[$city]);
+        }
+        
+        // $matches[$city] = check_plain($city_array_values[$city]);
+        // $matches[$city] = ($language->language == 'de') ? check_plain($city_array_values[$city]) : check_plain($city);
+    }
+    drupal_json_output($matches);
+}
+
+/**
+ * Implements hook_theme().
+ */
+function tradefair_theme($existing, $type, $theme, $path) {
+    return array(
+        'map' => array(
+            'template' => 'map',
+            'path' => drupal_get_path('module', 'tradefair') . '/themes',
+            'variables' => array('element' => NULL)
+        )
+    );
+}
+
+// function tradefair_init() {
+//     global $base_url;
+//     $my_settings = array(
+//         'baseurl' => $base_url . '/',
+//         'modulepath' => drupal_get_path('module', 'tradefair') . '/'
+//     );
+//     drupal_add_js(array('tradefair' => $my_settings), 'setting');
+// }
+
+function tradefair_init() {
+    global $base_url;
+    global $language;
+    $my_settings = array(
+        'baseurl' => $base_url . '/',
+        'modulepath' => drupal_get_path('module', 'tradefair') . '/',
+        'curlanguage' => $language->language,
+    );
+    drupal_add_js(array('tradefair' => $my_settings), 'setting');
+     drupal_add_js('jQuery(document).ready(function () {var OSName="Unknown OS";if(navigator.appVersion.indexOf("Win")!=-1)OSName="Windows";if(navigator.appVersion.indexOf("Mac")!=-1)OSName="MacOS";if(navigator.appVersion.indexOf("Linux")!=-1)OSName="Linux";if(navigator.appVersion.indexOf("X11")!=-1)OSName="UNIX";var type=navigator.userAgent;var isChromeOfTablet=type.search("Chrome");var deviceType=navigator.userAgent.toLowerCase().indexOf("mobile");if(OSName=="Linux" && isChromeOfTablet==-1 && deviceType==-1){jQuery("head").append("<style type=text/css>@media only screen and (min-device-width :800px) and (max-device-width :1280px) and (orientation :portrait){.nav-wrapper .language-switcher ul li,nav[role=navigation] li{font-size:11px}.nav-wrapper .language-switcher{position: relative;float: right;top: 2px;right: 0;margin-right: 0;padding-right: 10px;}.map .cities > ul > li{min-height:20px;}.europa-map .cities>ul>li.Berlin{left:53.51063829787234%;top:21.45922746781116%}.europa-map .cities>ul>li.Nuremberg{left:50%;top:61%}.europa-map .cities>ul>li.Munich{left:51.48936170212766%;top:72.10300429184549%}.europa-map .cities>ul>li.Stuttgart{left:44.8936170212766%;top:64.37768240343348%}.europa-map .cities>ul>li.Dusseldorf{left:40.21276595744681%;top:34.76394849785408%}.europa-map .cities>ul>li.Cologne{left:40.31914893617021%;top:39.48497854077253%}.europa-map .cities>ul>li.Leipzig{left:52.87234042553191%;top:27.89699570815451%}.europa-map .cities>ul>li.Frankfurt{left:42.02127659574468%;top:45.49356223175966%}.europa-map .cities>ul>li.Hamburg{left:47.02127659574468%;top:1.28755364806867%}}@media only screen and (min-device-width :800px) and (max-device-width :1280px) and (orientation :landscape){.map .cities > ul > li{min-height:20px;}}</style>")} });', 'inline');
+}
+
+function tradefair_cities($continent) {
+    $lang = arg(3);
+
+    $matches = array();
+    $query = new EntityFieldQuery;
+    $query->entityCondition('entity_type', 'node');
+    $query->entityCondition('bundle', 'tradefailr');    
+    $query->fieldCondition('field_continent', 'value', $continent, '=');
+    //$query->propertyCondition('language',  $lang, 'LIKE');
+
+
+    $result = $query->execute();
+    
+    $nodes = node_load_multiple(array_keys($result['node']));
+
+    foreach ($nodes as $node) {
+        $node = node_load($node->nid);
+        $city = field_get_items('node', $node, 'field_city');
+
+        $city_key = $city[0]['value'];
+
+
+        $field = field_info_field('field_city');
+        //$city_array_values = list_allowed_values($field);
+
+        //var_dump($field);die;
+
+        $city = $field['settings']['allowed_values'][$city_key];
+
+        if ($lang == 'de') {
+            $city = $field['settings']['allowed_values'][$city_key];
+        }
+        else{
+            $city = $city_key;
+        }        
+
+
+        if (!in_array($city, $matches)) {
+            $matches[$city_key] = check_plain($city);
+        }
+    }
+
+    drupal_json_output($matches);
+}
+
+function tradefair_ajax_list($city) {
+    $lang = arg(3);
+
+    $field = field_info_field('field_city');
+    $allowed_values = list_allowed_values($field);
+    $german_box_title = ($lang == "de") ? $allowed_values[$city] : $city;
+
+    $matches = array();
+    $query = new EntityFieldQuery;
+    $query->entityCondition('entity_type', 'node');    
+    $query->entityCondition('bundle', 'tradefailr');
+    $query->fieldCondition('field_city', 'value', $city, '=');
+
+    $result = $query->execute();
+
+    if (!$result){
+        return;
+    }
+    else{
+        $nodes = node_load_multiple(array_keys($result['node']), array('language' => $lang));
+    }
+    $final_array = array();
+    $final_array['boxtitle'] = $german_box_title;
+    foreach ($nodes as $node) {
+
+        $obj = new stdClass();
+        $obj->title = $node->title;
+        $obj->nid = drupal_get_path_alias('node/' . $node->nid); //$node->nid;
+        $matches[] = $obj;
+    }
+    $final_array['fairs'] =$matches; 
+    drupal_json_output($final_array);
+}
+
+/**
+ * Block to display the latest tradefairs in home page
+ *  Implementation of hook_block_info()
+ */
+function tradefair_block_info() {
+    $blocks['latest_tradefairs'] = array(
+        'info' => t('CURRENT EXHIBITIONS'),
+        'cache' => DRUPAL_CACHE_PER_USER,
+    );
+    
+    return $blocks;
+}
+
+/*
+ *
+ *  Implementation of hook_block_view().
+ */
+function tradefair_block_view($delta = '') {
+    
+    global $user;
+    global $language;
+    global $base_url;    
+    
+    switch ($delta) {
+        case 'latest_tradefairs':
+
+            $today_date = strtotime(date('d.m.y'));
+
+            $query = new EntityFieldQuery;
+            $query->entityCondition('entity_type', 'node');
+            $query->entityCondition('bundle', 'tradefailr');
+
+            $query->propertyCondition('language',  $language->language, 'LIKE');
+
+            $today_date = strtotime(date('d.m.y'));
+            $date = $today_date;
+
+            // $query->fieldCondition(strtotime('field_start_date'), 'value', $date, '>=');
+
+            // $query->fieldOrderBy('field_start_date', 'value', 'ASC');
+
+            // $query->fieldCondition('field_test_date', 'value', $date, '>=');
+
+            // $query->fieldCondition('field_end_date', 'value', $date, '>=', 1);
+            
+
+            $result = $query->execute();
+
+            // echo '<pre>';
+            // print_r($result);
+            // exit;
+
+            $nodes = node_load_multiple(array_keys($result['node']));
+
+            // echo '<pre>';
+            // print_r($nodes);
+            // exit;
+            $storage = array();
+            $content_all = array();
+            // $hold = array();
+            $hold = 0;
+            $temp = 0;
+            $diff = array();
+            foreach ($nodes as $node) {
+                
+                // print_r($node);
+                if (strtotime($node->field_start_date['und'][0]['value']) < $today_date)
+                    continue;
+                else {
+                    // $storage[strtotime($node->field_start_date['und'][0]['value'])] = $node->nid;
+                    $hold = strtotime($node->field_start_date['und'][0]['value']);
+                    
+                    $diff[$node->nid] = $hold - $today_date;
+                    
+                    $storage[$node->nid] = strtotime($node->field_start_date['und'][0]['value']);
+                    $content_all[$node->nid] = array('time' =>strtotime($node->field_start_date['und'][0]['value']), 'title' => $node->title);              
+                }
+
+            }
+                
+            $diff_copy = $diff;
+            sort($diff, 4);
+            $diff1 = array_slice($diff, 0, 3,true);
+           
+            $new_ids = array();
+            foreach($diff_copy as $key=>$value){
+                if ($value == $diff1[0] || $value == $diff1[1] || $value == $diff1[2]) {
+                    $new_ids[] = array($key, $value);
+                }
+            }
+            
+            $new_storage = $storage;
+            // echo '<pre>';
+            sort($storage);
+            // exit;
+            $array_slice = array_slice($storage, 0, 3);
+            $storage1 = array_flip($storage);
+            $new_storage1 = array_flip($new_storage);
+           
+            $new_data = array();
+            $node_id = 0;
+            foreach ($nodes as $node) {
+                # code...
+                if (strtotime($node->field_start_date['und'][0]['value']) == $array_slice[0] && empty($new_data[0]->nid)) {
+                    // echo '<pre>';
+                    // print_r($node);
+                    // exit;
+                    $new_data[0] = $node;
+                }
+                if (strtotime($node->field_start_date['und'][0]['value']) == $array_slice[1] && empty($new_data[0]->nid)) {
+                    $new_data[1] = $node;
+                }
+                if (strtotime($node->field_start_date['und'][0]['value']) == $array_slice[2] && empty($new_data[0]->nid)) {
+                    $new_data[2] = $node;
+                }
+                // $string .= '<li><a href="'. $base_url .'/node/'. $node->nid . '">' . $node->title . '</a></li>';
+            }
+            $string = '';
+            $string = '<ul>';
+            // foreach($new_data as $value) {
+            for($i = 0; $i< count($new_data); $i++) {
+                $string .= '<li><a href="'. $base_url .'/node/'. $new_data[$i]->nid . '">' . $new_data[$i]->title . '</a></li>';
+            }
+            // echo '<pre>';
+            // print_r($new_data);
+            // exit;
+            $string .= '</ul>';
+
+        $block['subject'] = t('CURRENT EXHIBITIONS');
+        $block['content'] = array (
+            '#markup' => $string,
+        );
+        
+        return $block;
+            
+    }
+}

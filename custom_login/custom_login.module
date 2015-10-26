@@ -1,0 +1,329 @@
+<?php
+
+
+
+/**
+ * Implements hook_form_alter()
+ */
+
+function custom_login_form_alter(&$form, &$form_state, $form_id){  
+
+	if ($form_id == 'user_login') {
+    //title of the login form
+    $form['title'] = array(
+      '#type' => 'markup',
+      '#markup' => t('Sign In'),
+      '#prefix' => '<h2>',
+      '#suffix' => '</h2>',
+      '#weight' => -1,
+      );
+		$form['name']['#title'] = t('Email or Member Name');
+		$form['pass']['#title'] = t('Password');
+    unset($form['name']['#description']);
+    unset($form['pass']['#description']);
+
+    $form['actions']['submit'] = array(
+      '#type' => 'submit', 
+      '#value' => t('SIGN IN')
+    );
+
+    $form['password_forget'] = array(
+      '#type' => 'link',
+      '#title' => t('Forget your password'),
+      '#href' => 'user/password',
+      );
+		
+	}
+	if ($form_id == 'user_register_form'){
+
+    drupal_set_title('SIGN IN / REGISTER');
+    
+    $form['title'] = array(
+      '#type' => 'markup',
+      '#markup' => t('Not a Member?'),
+      '#prefix' => '<h2>',
+      '#suffix' => '</h2>',
+      '#weight' => -101,
+      );
+
+    $form['customtext'] = array(
+        '#type' => 'item',
+        '#markup' => '<div > Membership is free, gives you access to galleries, allows you avail of exclusive offers and checkout with ease. <br><br> Just furnish us with some details and get started:</div>',
+        '#weight' => -100, // Adjust so that you can place it whereever 
+      );
+
+    unset($form['account']['name']['#title']);
+		unset($form['account']['name']['#description']);
+		$form['account']['name']['#attributes']['placeholder'] = t('Choose a Username');
+    $form['account']['name']['#weight'] = '50';
+
+    unset($form['account']['mail']['#title']);
+		unset($form['account']['mail']['#description']);
+		$form['account']['mail']['#attributes']['placeholder'] = t('Choose Email Address');
+    $form['account']['mail']['#weight'] = '51';
+
+
+    $form['account']['pass']['#type'] = 'password_confirm';
+    unset($form['account']['pass']['#title']);
+    $form['account']['pass']['#attributes']['placeholder'] = t('Re-Enter Password');
+    unset($form['account']['pass']['#description']);
+    $form['account']['pass']['#weight'] = '53';
+
+    $form['account']['subscribe'] = array(
+      '#type' => 'checkbox', 
+      '#title' => t('Yes, I want to get news letters, special offers and other cool stuff. By clicking Join you accept our Membership, Agreement, Privacy Policy and Terms of Use.'),
+      '#weight' => '53.5',
+      '#prefix' => '<div><span class="checkbox-message"></span>',
+      '#suffix' => '</div>',
+      //'#required' => TRUE,
+      );  
+    // valudating the checkbox. 
+    drupal_add_js('
+        jQuery(document).ready(function () {
+           var button = jQuery("#edit-submit");
+               button.attr("disabled","disabled");
+
+          jQuery("#edit-subscribe").click(function() {
+              var checked = jQuery(this).attr("checked");
+             
+              jQuery(this).attr("checked", "checked");
+             
+              if (checked) {
+                  jQuery(this).attr("checked", true);
+                  button.removeAttr("disabled"); 
+              }
+              else {
+                  jQuery(this).attr("checked", false);
+                  button.attr("disabled", "disabled");
+              }
+          });
+
+        });',
+        array('type' => 'inline')
+      );
+
+    $form['actions']['submit']['#value'] = t('JOIN');
+    $form['actions']['submit']['#weight'] = '53.6';
+
+    $form['actions']['thanks'] = array(
+        '#type' => 'item',
+        '#markup' => '<div ><h3>Thanks for choosing Discovered Ireland</h3><br>We\'ll help you choose the best of contemporary images of Ireland.</div>', 
+        '#weight' => '55',
+
+      );
+    $form['actions']['need_help'] = array(
+        '#type' => 'item',
+        '#markup' => '<h3>Need Help?</h3>',
+        '#weight' => '56',
+      );
+
+    $form['actions']['international'] = array(
+        '#type' => 'item',
+        '#markup' => '<div >International: 00 353 86 819 1123<br>Contact Us</div>',
+        '#weight' => '57',
+      ); 
+    
+	}
+
+    if ($form_id == 'uc_paypal_wps_form') {
+        if ($_SESSION['currency_type'] == 'EUR') {
+
+            $euro_to_usd_rate = exchange_rate_euro_to_usd();
+
+            //get the item price
+            $total = 0;
+            $items = uc_cart_get_contents();
+
+            foreach( $items as $item ){
+                $total += ($item->qty * $item->price);
+            }
+            $total = round($total * $euro_to_usd_rate, 2);
+
+            //gets the order details
+            $order = uc_order_load(intval($_SESSION['cart_order']));
+
+            $handling_cart = $order->line_items[0]['amount'] * $euro_to_usd_rate;
+            $handling_cart = round($handling_cart, 2);
+
+            $tax = $order->line_items[1]['amount'] * $euro_to_usd_rate;
+            $tax = round($tax, 2);
+
+            // echo '<pre>';
+            // print$handling_cart;
+            // print $tax;
+            // exit;
+            
+            $form['amount_1'] = array (
+              '#type' => 'hidden',
+              '#value' => $total, 
+              );
+
+            $form['handling_cart'] = array (
+              '#type' => 'hidden',
+              '#value' => $handling_cart, 
+              );
+
+            $form['tax_cart'] = array (
+                '#type' => 'hidden',
+                '#value' => $tax, 
+                );
+
+            // $form['handling_cart'] = array (
+            //     '#type' => 'hidden',
+            //     '#value' => 5, 
+            //     );
+        }
+    }
+
+}
+
+
+
+/**
+* Logintobbogin provides the code to consolidate
+* the registration page and the login page however
+* it doesn't do exactly the way we want so we will 
+* take the code. 
+* @see http://drupal.org/project/logintoboggan
+*/
+
+ /**
+ * Implementation of hook_menu_alter().
+ */
+function custom_login_menu_alter(&$callbacks) {
+  // Kill the tabs on the login pages.
+  $callbacks['user/login']['type'] = MENU_NORMAL_ITEM;
+  $callbacks['user/login']['page callback'] = 'custom_login_login_page';
+  $callbacks['user/register']['type'] = MENU_CALLBACK;
+  $callbacks['user/register']['page callback'] = 'custom_login_login_page';
+  $callbacks['user/register']['page arguments'] = array('register');
+  $callbacks['user/password']['type'] = MENU_CALLBACK;
+  $callbacks['user']['page callback'] = 'custom_login_login_page';
+}
+/**
+ * Menu callback for user/login
+ *   creates a unified login/registration form (without tabs)
+ */
+function custom_login_login_page() {
+  global $user;
+  if ($user->uid) {
+    menu_set_active_item('user/' . $user->uid);
+    return menu_execute_active_handler(NULL, FALSE);
+  }
+  else {
+    // Title just clutters the interface...
+    drupal_set_title('');     
+
+    $register_form = drupal_get_form('user_register_form');
+  	$login_form = drupal_get_form('user_login');
+  	$rendered_register_form = '<div class="row"><div class="col-md-7 custom-form">' . drupal_render($login_form). '</div>';
+  	$rendered_register_form .= '<div class="col-md-5">' . drupal_render($register_form) . '</div></div>'; 
+
+  	return $rendered_register_form;
+  } 
+}
+
+/**
+ * Implement hook_user_insert
+ */
+function custom_login_user_insert(&$edit, $account, $category){
+
+  require_once 'examples/inc/MCAPI.class.php';
+  require_once 'examples/inc/config.inc.php';
+  
+  $name = $edit['name'];
+  $email = $edit['mail'];
+
+  $api = new MCAPI($apikey);
+  $my_email = $email;
+ 
+  $merge_vars = array('FNAME'=>$name, 
+                    
+                      );
+   
+  // By default this sends a confirmation email - you will not see new members
+  // until the link contained in it is clicked!
+  $retval = $api->listSubscribe( $listId, $my_email, $merge_vars );
+   
+  // if ($api->errorCode){
+  //   echo "Unable to load listSubscribe()!\n";
+  //   echo "\tCode=".$api->errorCode."\n";
+  //   echo "\tMsg=".$api->errorMessage."\n";
+  // } else {
+  //     echo "Subscribed - look for the confirmation email!\n";
+  // }
+
+
+  /*drupal_add_js('
+    jQuery(document).ready(function () { 
+      alert("Testing of user insert");
+      var name = "<?php print $name; ?>";
+      var email = "<?php print $email; ?>";
+      jQuery("#mce-FNAME").val(name);
+      jQuery("#mce-EMAIL").val(email);
+      jQuery("#mc-embedded-subscribe").click();
+    });',
+    array('type' => 'inline')
+  );*/
+  
+}
+
+
+/**
+ * Implements hook_menu()
+ */
+
+function custom_login_menu(){
+  $items = array();
+
+  $items['ajax/currency/%'] = array(
+    'page callback' => 'currency_session',
+    'page arguments' => array(2),
+    'access callback' => TRUE,
+    'type' => MENU_CALLBACK,
+    );
+  return $items;
+}
+
+
+/**
+ * Implements hook_init();
+ */
+
+function custom_login_init() {
+    global $base_url;
+
+    if (!array_key_exists('currency_type', $_SESSION)) {
+        $_SESSION['currency_type'] = 'USD';
+        $_SESSION['currency_sign'] = '$';
+    }
+    
+    global $base_url;
+    global $language;
+    $my_settings = array(
+        'baseurl' => $base_url . '/',
+        'modulepath' => drupal_get_path('module', 'custom_login') . '/',
+    );
+    drupal_add_js(array('custom_login' => $my_settings), 'setting');
+    drupal_add_js($base_url . '/' . drupal_get_path('theme', 'discoveredireland') . '/js/session.js');
+}
+
+function currency_session($currency){
+    if ($currency == 'EUR') {
+
+        unset($_SESSION['currency_type']);
+        unset($_SESSION['currency_sign']);
+
+        $_SESSION['currency_type'] = 'EUR';
+        $_SESSION['currency_sign'] = '€';
+    }
+    else {
+
+        unset($_SESSION['currency_type']);
+        unset($_SESSION['currency_sign']);
+
+        $_SESSION['currency_type'] = 'USD';
+        $_SESSION['currency_sign'] = '$';
+    }
+}
+

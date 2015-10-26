@@ -1,0 +1,10 @@
+name = "Tradefairs"
+description = A module which handles the tradefairs.
+package = "TRADEFAIRS"
+core = 7.x
+author = Sanjeev
+
+files[] = tradefair.module
+
+
+php = 5.2

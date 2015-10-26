@@ -1,0 +1,609 @@
+<?php
+
+// $Id$
+/**
+ * @file
+ * A module for creating product_management entity.
+ */
+
+/**
+ * Implements hook_menu().
+ * Creates the menu for admin UI and realted paths for product_management entity
+ * @return array
+ */
+function product_management_menu() {
+    $items['all/%'] = array(
+        'title' => t('Shop'),
+        'description' => 'Shop',
+        'access callback' => TRUE,
+        'page callback' => 'drupal_get_form',
+        'page arguments' => array('product_management_filter_form', 1),
+        'type' => MENU_CALLBACK
+    );
+
+    return $items;
+}
+
+function get_taxonomy_terms($vocabulary_name) {
+    $voc_obj = taxonomy_vocabulary_machine_name_load($vocabulary_name);
+    $vid = $voc_obj->vid;
+    $options = array();
+    if ($terms = taxonomy_get_tree($vid)) {
+        foreach ($terms as $term) {
+            $options[$term->tid] = $term->name;
+        }
+    }
+    return $options;
+}
+
+function get_photographers() {
+    $photographers = array();
+    $pquery = db_select('node', 'n');
+    $pquery->fields('n');
+    $pquery->condition('type', 'photographer');
+
+    $photographers_lists = $pquery->execute()->fetchAll();
+    $photographers = array();
+    foreach ($photographers_lists as $photographer) {
+        $photographers [$photographer->vid] = $photographer->title;
+    }
+    return $photographers;
+}
+
+/**
+ * Callback function to display the the shop page
+ * @return <type>
+ */
+function product_management_filter_form($form, &$form_state, $category_name) {
+    global $base_path;
+    // var_dump($category_name);
+
+    $subjects = get_taxonomy_terms('subjects');
+    $cities = get_taxonomy_terms('cities');
+    $styles = get_taxonomy_terms('styles');
+    $room = get_taxonomy_terms('room');
+
+    $location = get_taxonomy_terms('locations');
+
+
+    $pquery = db_select('node', 'n');
+    $pquery->fields('n');
+    $pquery->condition('type', 'photographer');
+
+    $photographers_lists = $pquery->execute()->fetchAll();
+    $photographers = array();
+    foreach ($photographers_lists as $photographer) {
+        $photographers [$photographer->vid] = $photographer->title;
+    }
+
+    $search_result = array();
+
+    $query = db_select('node', 'n');
+    $query->fields('n');
+    $query->condition('type', 'product');
+    $query->orderBy('created', 'DESC');
+
+    $query->addField('su', 'field_subjects_tid', 'subject');
+    $query->addField('st', 'field_style_name_tid', 'style');
+    $query->addField('ro', 'field_room_name_tid', 'room');
+    $query->addField('c', 'field_city_name_tid', 'city');
+    $query->addField('img', 'uc_product_image_fid', 'fid');
+    $query->addField('pg', 'field_name_of_photographers_nid', 'pgrapher');
+
+    $query->addField('l', 'field_location_tid', 'location');
+
+
+    //Join the drupal field
+    $query->leftJoin('field_data_field_subjects', 'su', 'n.nid = su.entity_id');
+    $query->leftJoin('field_data_field_style_name', 'st', 'n.nid = st.entity_id');
+    $query->leftJoin('field_data_field_room_name', 'ro', 'n.nid = ro.entity_id');
+    $query->leftJoin('field_data_field_city_name', 'c', 'n.nid = c.entity_id');
+    $query->leftJoin('field_data_uc_product_image', 'img', 'n.nid = img.entity_id');
+    $query->leftJoin('field_data_field_name_of_photographers', 'pg', 'n.nid = pg.entity_id');
+
+    $query->leftJoin('field_data_field_location', 'l', 'n.nid = l.entity_id');
+
+    if ($_POST) {
+        $checked_elements = array();
+
+        $checked_elements['subject'] = isset($_POST['subject']) ? $_POST['subject'] : "";
+        $checked_elements['style'] = isset($_POST['style']) ? $_POST['style'] : "";
+        $checked_elements['room'] = isset($_POST['room']) ? $_POST['room'] : "";
+        $checked_elements['city'] = isset($_POST['city']) ? $_POST['city'] : "";
+        $checked_elements['photographer'] = isset($_POST['photographer']) ? $_POST['photographer'] : "";
+
+        $checked_elements['location'] = isset($_POST['location']) ? $_POST['location'] : "";
+
+        $filter_conditional_string = get_filter_query_string($checked_elements);
+        $query->condition($filter_conditional_string);
+        $query = $query->extend('PagerDefault')->limit(12);
+        $search_result = $query->execute()->fetchAll();
+    
+    } else {
+        switch ($category_name) {
+            case 'subjects':
+                drupal_set_title('SUBJECTS');
+                $view = views_get_view('subjects');
+                $view->execute();
+                $response = $view->result;
+                $search_result = searchResultArrayObject($response);             
+                break;
+
+            case 'places':
+                drupal_set_title('PLACES');
+                $view = views_get_view('places');
+                $view->execute();
+                $response = $view->result;
+                $search_result = searchResultArrayObject($response); 
+                break;
+
+            case 'counties':
+                drupal_set_title('COUNTIES');
+                $view = views_get_view('county');
+                $view->execute();
+                $response = $view->result;
+                $search_result = searchResultArrayObject($response); 
+                break;
+
+            case 'cities':
+                drupal_set_title('CITIES');
+                $view = views_get_view('cities');
+                $view->execute();
+                $response = $view->result;
+                $search_result = searchResultArrayObject($response); 
+                break;
+
+            case 'landmarks':
+                drupal_set_title('LANDMARKS');
+                $view = views_get_view('landmarks');
+                $view->execute();
+                $response = $view->result;
+                $search_result = searchResultArrayObject($response); 
+                break;
+
+            case 'styles':
+                drupal_set_title('STYLES');
+                $view = views_get_view('styles');
+                $view->execute();
+                $response = $view->result;
+                $search_result = searchResultArrayObject($response); 
+                break;
+            
+            case 'photographers':
+                drupal_set_title('PHOTOGRAPHERS');
+                $view = views_get_view('photographers');
+                $view->execute();
+                $response = $view->result;
+                $search_result = searchResultArrayObject($response); 
+                break;
+
+            case 'rooms':
+                drupal_set_title('SHOP BY ROOM');
+                $view = views_get_view('rooms');
+                $view->execute();
+                $response = $view->result;
+                $search_result = searchResultArrayObject($response); 
+                break;
+
+            // case 'collections':
+            //     drupal_set_title('COLLECTIONS');
+            //     $view = views_get_view('collection');
+            //     $view->execute();
+            //     $response = $view->result;
+            //     $search_result = searchResultArrayObject($response); 
+            //     break;
+            default:
+                # code...
+                break;
+        }  
+     
+    }
+
+    //$query = $query->extend('PagerDefault')->limit(5);
+    //$search_result = $query->execute()->fetchAll();
+
+    $form['top'] = array(
+        '#type' => 'markup',
+        '#prefix' => '<div class="text-wrapper">
+                      <p>Discovered Ireland is home to some of Ireland’s greatest photographers. Browse through our collection of 3,000 images - all of which can be purchased as prints, canvas prints, posters, and more. When you\'re ready, we\'ll deliver a museum-quality, frame ready piece right to your doorstep. Choose to browse from any of our most popular catagories below.</p>',
+        '#suffix' => '</div>',
+    );
+
+    $form['left_search_box'] = array(
+        '#type' => 'markup',
+        '#prefix' => '<div class="row">
+                      <div class="col-md-3">
+                      <div id="right-filter-bar" class="sidebar-filter-module">
+                      <h2>Filter your results</h2>
+                      <div class="accordian-wrapper">',
+        '#suffix' => '</div></div>',
+    );
+
+    $form['left_search_box']['subject_header'] = array(
+        '#type' => 'markup',
+        '#prefix' => '<h3 class="filter-title" id="filter-title1">',
+        '#suffix' => t('Subjects') . '<span class="toggle-open"></span></h3>',
+    );
+
+    $form['left_search_box']['subject'] = array(
+        '#type' => 'checkboxes',
+        '#options' => $subjects,
+        '#prefix' => '<div class="options" id="options1">',
+        '#suffix' => '</div>',
+    );
+
+    $form['left_search_box']['city_header'] = array(
+        '#type' => 'markup',
+        '#prefix' => '<h3 class="filter-title" id="filter-title2">',
+        '#suffix' => t('Places') . '<span class="toggle-open"></span></h3>',
+    );
+
+    $form['left_search_box']['city'] = array(
+        '#type' => 'checkboxes',
+        '#options' => $cities,
+        '#prefix' => '<div class="options" id="options2">',
+        '#suffix' => '</div>',
+    );
+
+
+    $form['left_search_box']['style_header'] = array(
+        '#type' => 'markup',
+        '#prefix' => '<h3 class="filter-title" id="filter-title3">',
+        '#suffix' => t('Photography styles') . '<span class="toggle-open"></span></h3>',
+    );
+
+    $form['left_search_box']['style'] = array(
+        '#type' => 'checkboxes',
+        '#options' => $styles,
+        '#prefix' => '<div class="options" id="options3">',
+        '#suffix' => '</div>',
+    );
+
+    $form['left_search_box']['photographer_header'] = array(
+        '#type' => 'markup',
+        '#prefix' => '<h3 class="filter-title" id="filter-title4">',
+        '#suffix' => t('Photographers') . '<span class="toggle-open"></span></h3>',
+    );
+
+    $form['left_search_box']['photographer'] = array(
+        '#type' => 'checkboxes',
+        '#options' => $photographers,
+        '#prefix' => '<div class="options" id="options4">',
+        '#suffix' => '</div>',
+    );
+
+
+    $form['left_search_box']['room_header'] = array(
+        '#type' => 'markup',
+        '#prefix' => '<h3 class="filter-title" id="filter-title5">',
+        '#suffix' => t('Shop by room') . '<span class="toggle-open"></span></h3>',
+    );
+
+    $form['left_search_box']['room'] = array(
+        '#type' => 'checkboxes',
+        '#options' => $room,
+        '#prefix' => '<div class="options" id="options5">',
+        '#suffix' => '</div></div>',
+    );
+
+    // $form['left_search_box']['best_seller'] = array(
+    //     '#type' => 'link',
+    //     '#prefix' => '<h3 class="filter-title">',
+    //     '#suffix' => t('Shop by room') . '</h3>',
+    //     '#link' => $base_path . 'best-sellers',
+    // );
+
+    // $form['left_search_box']['best_seller1'] = array(
+    //     '#type' => 'link',
+    //     '#title' => t('Best sellers'),
+    //     '#href' => 'best-sellers',
+    //     '#prefix' => '<h3>',
+    //     '#suffix' => '</h3>',
+    // );
+
+    $form['left_search_box']['submit'] = array(
+        '#type' => 'submit',
+        '#value' => t('Apply'),
+        '#attributes' => array('class' => array('submit-button')),
+    );
+    $form['right-bar']['list'] = array(
+        '#theme' => 'product_management_search_result',
+        '#element' => $search_result,
+        '#weight' => 1,
+        '#prefix' => '<div class="search-results col-md-9">',
+        '#suffix' => '</div></div>',
+    );
+
+    // $form['right-bar']['pager'] = array('#markup' => theme('pager', array('tags' => NULL)));
+    return $form;
+}
+
+function product_management_filter_form_submit($form, &$form_state) {
+    $form_state['rebuild'] = TRUE;
+}
+
+function get_filter_query_string($checked_elements) {
+    $str = db_or();
+
+    if (!empty($checked_elements['subject'])) {
+        foreach ($checked_elements['subject'] as $key => $val) {
+            $str->condition('su.field_subjects_tid', "%$val%", 'LIKE');
+        }
+    }
+
+    if (!empty($checked_elements['style'])) {
+        foreach ($checked_elements['style'] as $key => $val) {
+            $str->condition('st.field_style_name_tid', "%$val%", 'LIKE');
+        }
+    }
+
+    if (!empty($checked_elements['room'])) {
+        foreach ($checked_elements['room'] as $key => $val) {
+            $str->condition('ro.field_room_name_tid', "%$val%", 'LIKE');
+        }
+    }
+
+    if (!empty($checked_elements['city'])) {
+        foreach ($checked_elements['city'] as $key => $val) {
+            $str->condition('c.field_city_name_tid', "%$val%", 'LIKE');
+        }
+    }
+
+    if (!empty($checked_elements['photographer'])) {
+        foreach ($checked_elements['photographer'] as $key => $val) {
+            $str->condition('pg.field_name_of_photographers_nid', "%$val%", 'LIKE');
+        }
+    }
+
+    if (!empty($checked_elements['location'])) {
+        foreach ($checked_elements['location'] as $key => $val) {
+            $str->condition('l.field_location_tid', "%$val%", 'LIKE');
+        }
+    }
+
+
+    return $str;
+}
+
+/*
+ * Adds our theme specificiations to the Theme Registry.
+ * This function is useful for templating
+ * @param <type> $existing
+ * @param <type> $type
+ * @param <type> $theme
+ * @param <type> $path
+ * @return <type>
+ */
+
+function product_management_theme($existing, $type, $theme, $path) {
+    return array(
+        'product_management_search_result' => array(
+            'variables' => array('element' => array()),
+            'path' => drupal_get_path('module', 'product_management') . '/themes',
+            'template' => 'product_management_search_result'
+        )
+    );
+}
+
+/**
+ *
+ * @param array $variables
+ * @param <type> $hook 
+ */
+function product_management_preprocess_page(&$vars, $hook) {
+
+    global $base_url;
+
+    $counties = get_taxonomy_terms('countries');
+    $landmarks = get_taxonomy_terms('landmark');
+
+    $subjects = get_taxonomy_terms('subjects');
+    $cities = get_taxonomy_terms('cities');
+    $styles = get_taxonomy_terms('styles');
+    $photographers = get_photographers();
+    $rooms = get_taxonomy_terms('room');
+    $collections = get_taxonomy_terms('collections');
+
+    // $locations = get_taxonomy_terms('locations');
+
+
+    $header_menu = '<ul id="header-menu">';
+    $url = url($base_url);
+    $url_active = "";
+
+    $header_menu .= '<li class="first-level shop ' . $url_active . '"><a id= "shop-trigger" href="' . $base_url . '/content/shop' . '" >' . t('Shop') . '</a>';
+    $header_menu .='<div class="submenu"><ul class="shop-container">';
+
+    //subjects
+    $header_menu .='<li class="subject-trigger triggerer"><a class = "triggerer-anc" href="' . $base_url . '/all/subjects' . '">Subjects</a>';
+    $header_menu .='<ul class="subjects-container sl-container child-submenu">';
+
+    // foreach ($subjects as $sk => $subject) {
+    //     $header_menu .='<li><a href="' . $base_url . '/subject/' . $sk . '">' . $subject . '</a></li>';
+    // }
+
+    foreach ($subjects as $sk => $subject) {
+       $url = drupal_lookup_path('alias', 'taxonomy/term/'.$sk, $lang_code = NULL);
+       
+        $header_menu .='<li><a href="' . $base_url . '/' . $url . '">' . $subject . '</a></li>';
+    }
+
+    $header_menu .='</ul>';
+    $header_menu .='</li>';
+
+
+    //Places
+    $header_menu .='<li class="photographer-trigger triggerer"><a class = "triggerer-anc" href="' . $base_url . '/all/places' . '">Places</a>';
+    $header_menu .='<div class="sub-category-menu child-submenu"><ul>';
+
+
+    //Counties
+    $header_menu .='<li><a href="' . $base_url . '/all/counties' . '">Counties</a>';
+    $header_menu .='<ul>';
+
+    foreach ($counties as $ck => $place) {
+        // $header_menu .='<li><a href="' . $base_url . '/counties/' . $ck . '">' . $place . '</a></li>';
+        $url = drupal_lookup_path('alias', 'taxonomy/term/'.$ck, $lang_code = NULL);
+       
+        $header_menu .='<li><a href="' . $base_url . '/' . $url . '">' . $place . '</a></li>';
+    }
+    $header_menu .='</ul>';
+    $header_menu .='</li>';
+
+    //Cities
+    $header_menu .='<li><a href="' . $base_url . '/all/cities' . '">Cities</a>';
+    $header_menu .='<ul>';
+
+    foreach ($cities as $ck => $place) {
+        // $header_menu .='<li><a href="' . $base_url . '/city/' . $ck . '">' . $place . '</a></li>';
+        $url = drupal_lookup_path('alias', 'taxonomy/term/'.$ck, $lang_code = NULL);
+       
+        $header_menu .='<li><a href="' . $base_url . '/' . $url . '">' . $place . '</a></li>';
+    }
+    $header_menu .='</ul>';
+    $header_menu .='</li>';
+
+    //Landmark
+    $header_menu .='<li><a href="' . $base_url . '/all/landmarks' . '">Landmark</a>';
+    $header_menu .='<ul>';
+
+    foreach ($landmarks as $lm => $land) {
+        // $header_menu .='<li><a href="' . $base_url . '/landmark/' . $lm . '">' . $land . '</a></li>';
+        $url = drupal_lookup_path('alias', 'taxonomy/term/'.$lm, $lang_code = NULL);
+       
+        $header_menu .='<li><a href="' . $base_url . '/' . $url . '">' . $land . '</a></li>';
+    }
+    $header_menu .='</ul>';
+    $header_menu .='</li>';
+
+    $header_menu .='</ul>';
+    $header_menu .='</li>';
+
+
+    //style
+    $header_menu .='<li class="style-trigger triggerer"><a class = "triggerer-anc" href="' . $base_url . '/all/styles' . '">Styles</a>';
+    $header_menu .='<ul class="style-container sl-container child-submenu">';
+
+    foreach ($styles as $sk => $style) {
+        // $header_menu .='<li><a href="' . $base_url . '/style/' . $sk . '">' . $style . '</a></li>';
+        $url = drupal_lookup_path('alias', 'taxonomy/term/'.$sk, $lang_code = NULL);
+       
+        $header_menu .='<li><a href="' . $base_url . '/' . $url . '">' . $style . '</a></li>';
+    }
+    $header_menu .='</ul>';
+    $header_menu .='</li>';
+
+
+    //photographer
+    $header_menu .='<li class="photographer-trigger triggerer"><a class = "triggerer-anc" href="' . $base_url . '/all/photographers' . '">Photographers</a>';
+    $header_menu .='<ul class="photographer-container sl-container child-submenu">';
+
+    foreach ($photographers as $sk => $photographer) {
+        $header_menu .='<li><a href="' . $base_url . '/photographer/' . $sk . '">' . $photographer . '</a></li>';
+    }
+    $header_menu .='</ul>';
+    $header_menu .='</li>';
+
+    //room
+    $header_menu .='<li class="room-trigger triggerer"><a class = "triggerer-anc" href="' . $base_url . '/all/rooms' . '">Shop by room</a>';
+    $header_menu .='<ul class="room-container sl-container child-submenu">';
+
+
+    foreach ($rooms as $sk => $room) {
+        // $header_menu .='<li><a href="' . $base_url . '/room/' . $sk . '">' . $room . '</a></li>';
+        $url = drupal_lookup_path('alias', 'taxonomy/term/'.$sk, $lang_code = NULL);
+       
+        $header_menu .='<li><a href="' . $base_url . '/' . $url . '">' . $room . '</a></li>';
+    }
+    $header_menu .='</ul>';
+    $header_menu .='</li>';
+
+
+    //collection
+    $header_menu .='<li class="collection-trigger triggerer"><a class = "triggerer-anc" href="' . $base_url . '/collections/all' . '">Collections</a>';
+    $header_menu .='<ul class="collection-container sl-container child-submenu">';
+
+    //collection url changed so to get dynamic description.
+    // foreach ($collections as $sk => $collection) {
+    //     $header_menu .='<li><a class= "$ck" href="' . $base_url . '/collections/' . $sk . '">' . $collection . '</a></li>';
+    // }
+
+    foreach ($collections as $sk => $collection) {
+        
+        // $header_menu .='<li>' . l($collection, $base_url . '/taxonomy/term/' . $sk ) . '</li>';
+        $url = drupal_lookup_path('alias', 'taxonomy/term/'.$sk, $lang_code = NULL);
+       
+        $header_menu .='<li><a href="' . $base_url . '/' . $url . '">' . $collection . '</a></li>';
+    }
+    $header_menu .='</ul>';
+    $header_menu .='</li>';
+
+
+    // best seller
+    $header_menu .='<li class="bestseller-trigger triggerer"><a href="' . $base_url. '/best-sellers' . '">Best sellers</a>';
+    $header_menu .='</li>';
+
+
+    $header_menu .='</ul></li>';
+
+    $header_menu .= '<li class="first-level about ' . $url_active . '"><a href="' . $base_url . '/content/about' . '">' . t('About') . '</a></li>';
+    // $header_menu .= '<li class="first-level pgrapher ' . $url_active . '"><a href="' . $url . '">' . t('Photographer') . '</a></li>';
+
+    //photographer
+    $header_menu .='<li class="photographer-trigger triggerer"><a class = "triggerer-anc" href="' . $base_url . '/photographers' . '">Photographers</a>';
+    $header_menu .='<div class="submenu"><ul class="photographer-container sl-container">';
+
+    foreach ($photographers as $sk => $photographer) {
+        $header_menu .='<li><a class= "$ck" href="' . $base_url . '/photographer/' . $sk . '">' . $photographer . '</a></li>';
+    }
+    $header_menu .='</ul>';
+    $header_menu .='</li>';
+
+    $header_menu .= '<li class="first-level about ' . $url_active . '"><a href="' . $base_url . '/blog' . '">' . t('Blog') . '</a></li>';
+    $header_menu .= '<li class="first-level pgrapher ' . $url_active . '"><a href="' . $base_url . '/content/inspiration' . '">' . t('Inspiration') . '</a></li>';
+    $header_menu .= '<li class="first-level pgrapher ' . $url_active . '"><a href="' . $base_url . '/contact' . '">' . t('Contact') . '</a></li>';
+
+    $header_menu .= '</ul>';
+    $vars['header_menu'] = $header_menu;
+}
+
+
+//formates the results according to the search result to the template file
+function searchResultArrayObject($response) {
+    $search_result = array();
+    foreach ($response as $key => $value) {
+        $search_result_object = new stdClass();
+
+        $nodes = node_load($value->nid);
+
+        $search_result_object->nid = $value->nid;
+        $search_result_object->vid = $nodes->vid;        
+        $search_result_object->type = $nodes->type;
+        $search_result_object->language = $nodes->language;
+        $search_result_object->title = $nodes->title;
+        $search_result_object->uid = $nodes->uid;
+        $search_result_object->status = $nodes->status;
+        $search_result_object->created = $nodes->created;
+        $search_result_object->changed = $nodes->changed;
+        $search_result_object->comment = $nodes->comment;
+        $search_result_object->promote = $nodes->promote;
+        $search_result_object->sticky = $nodes->sticky;
+        $search_result_object->tnid = $nodes->tnid;
+        $search_result_object->translate = $nodes->translate;
+        $search_result_object->subject = $nodes->field_subjects['und'][0]['tid'];
+        $search_result_object->style = $nodes->field_style_name['und'][0]['tid'];
+        $search_result_object->room = $nodes->field_room_name['und'][0]['tid'];
+        $search_result_object->city = $nodes->field_city_name['und'][0]['tid'];
+        $search_result_object->fid = $nodes->uc_product_image['und'][0]['fid'];
+        $search_result_object->pgrapher = $nodes->field_name_of_photographers['und']['0']['nid'];
+        // $search_result_object->location = $nodes->field_location['und'][0]['tid'];  
+        $search_result_object->locations = $nodes->field_locations['und'][0]['value'];      
+
+        $search_result[]  = $search_result_object;
+
+    }
+    //return for the localhost
+    return $search_result;
+    //return for server
+    // return theme('product_management_search_result', array('element' => $search_result) ); 
+}

@@ -1,0 +1,7 @@
+name = Custom Login 
+description = A module to alter login and registration
+package = Discovered Ireland
+version = VERSION
+core = 7.x
+
+files[] = custom_login.module
